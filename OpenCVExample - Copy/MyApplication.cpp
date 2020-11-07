@@ -35,8 +35,12 @@ MatND* computeHistogram(Mat& image, Mat& histo_img) {
 	return histogram;
 }
 
-void applyProcessingToFrame(Mat& src, Mat& dst) {
+void applyProcessingToFrame(Mat& src, Mat& dst, bool applyBlur = false) {
 	src.convertTo(dst, -1, 1, -100); //decrease the brightness by 100
+	if (applyBlur) {
+		addGaussianNoise(dst, 0, 20.0);
+		GaussianBlur(dst, dst, Size(5, 5), 3);
+	}
 }
 
 void MyApplication()
@@ -70,6 +74,7 @@ void MyApplication()
 	video >> current_frame;
 	Mat& first_frame = current_frame.clone();
 
+	// Grab first frame for selective avg background.
 	applyProcessingToFrame(current_frame, selective_running_average_background);
 	selective_running_average_background.convertTo(selective_running_average_background, CV_32F);
 
@@ -79,23 +84,12 @@ void MyApplication()
 	while ((!current_frame.empty()))
 	{
 		Mat processed_img = current_frame.clone();
-		applyProcessingToFrame(current_frame, processed_img);
-		// current_frame.convertTo(current_frame, -1, 1, -100); //decrease the brightness by 50
-
-		Mat blurred = current_frame.clone();
-		addGaussianNoise(blurred, 0.0, 20.0);
-		imshow("Test_blurred", blurred);
-		GaussianBlur(blurred, blurred, Size(5, 5), 3);
-		imshow("Test_blurred after gaussian", blurred);
-		current_frame = blurred;
-		double duration = static_cast<double>(getTickCount());
-		vector<Mat> input_planes(3);
-		split(current_frame, input_planes);
+		applyProcessingToFrame(current_frame, processed_img, true);	
 		// Running Average with selective update
 		vector<Mat> selective_running_average_planes(3);
 		// Find Foreground mask
 		selective_running_average_background.convertTo(temp_selective_running_average_background, CV_8U);
-		absdiff(temp_selective_running_average_background, current_frame, selective_running_average_difference);
+		absdiff(temp_selective_running_average_background, processed_img, selective_running_average_difference);
 		split(selective_running_average_difference, selective_running_average_planes);
 		// Determine foreground points as any point with an average difference of more than 30 over all channels:
 		Mat temp_sum = (selective_running_average_planes[0] / 3 + selective_running_average_planes[1] / 3 + selective_running_average_planes[2] / 3);
@@ -106,28 +100,23 @@ void MyApplication()
 		imshow("after open", opened_image);
 		selective_running_average_foreground_mask = opened_image;
 
-		char t = cv::waitKey();
+		// updateAvgSelectiveBackground();
 		// Update background
+		vector<Mat> input_planes(3);
+		split(processed_img, input_planes);
 		split(selective_running_average_background, selective_running_average_planes);
 		accumulateWeighted(input_planes[0], selective_running_average_planes[0], running_average_learning_rate, selective_running_average_foreground_mask);
 		accumulateWeighted(input_planes[1], selective_running_average_planes[1], running_average_learning_rate, selective_running_average_foreground_mask);
 		accumulateWeighted(input_planes[2], selective_running_average_planes[2], running_average_learning_rate, selective_running_average_foreground_mask);
 		invertImage(selective_running_average_foreground_mask, selective_running_average_foreground_mask);
-		accumulateWeighted(input_planes[0], selective_running_average_planes[0], running_average_learning_rate / 3.0, selective_running_average_foreground_mask);
-		accumulateWeighted(input_planes[1], selective_running_average_planes[1], running_average_learning_rate / 3.0, selective_running_average_foreground_mask);
-		accumulateWeighted(input_planes[2], selective_running_average_planes[2], running_average_learning_rate / 3.0, selective_running_average_foreground_mask);
-		merge(selective_running_average_planes, selective_running_average_background);
 
 		selective_running_average_foreground_image.setTo(Scalar(0, 0, 0));
 		current_frame.copyTo(selective_running_average_foreground_image, selective_running_average_foreground_mask);
-
 		Mat histo_img;
 		MatND* colour_histogram = computeHistogram(selective_running_average_foreground_image, histo_img);
 		imshow("histo", histo_img);
-		duration = static_cast<double>(getTickCount()) - duration;
-		duration /= getTickFrequency() / 1000.0;
-		int delay = (time_between_frames > duration) ? ((int)(time_between_frames - duration)) : 1;
-		char c = cv::waitKey(delay);
+
+		char c = cv::waitKey(250);
 
 		char frame_str[100];
 		sprintf(frame_str, "Frame = %d", frame_count);
