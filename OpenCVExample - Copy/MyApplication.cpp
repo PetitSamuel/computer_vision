@@ -43,6 +43,25 @@ void applyProcessingToFrame(Mat& src, Mat& dst, bool applyBlur = false) {
 	}
 }
 
+vector<Mat> findForegroundMask(Mat& src_background, Mat& temp_selective_running_average_background, Mat& processed_img) {
+	// Find Foreground mask
+	Mat selective_running_average_difference;
+	vector<Mat> selective_running_average_planes(3);
+	src_background.convertTo(temp_selective_running_average_background, CV_8U);
+	absdiff(temp_selective_running_average_background, processed_img, selective_running_average_difference);
+	split(selective_running_average_difference, selective_running_average_planes);
+	return selective_running_average_planes;
+}
+
+void updateAvgSelectiveBackground(vector<Mat> input_planes, vector<Mat> selective_running_average_planes, Mat& mask_output) {
+	double running_average_learning_rate = 0.01;
+	accumulateWeighted(input_planes[0], selective_running_average_planes[0], running_average_learning_rate, mask_output);
+	accumulateWeighted(input_planes[1], selective_running_average_planes[1], running_average_learning_rate, mask_output);
+	accumulateWeighted(input_planes[2], selective_running_average_planes[2], running_average_learning_rate, mask_output);
+	invertImage(mask_output, mask_output);
+	
+}
+
 void MyApplication()
 {
 	// Load video(s)
@@ -66,9 +85,7 @@ void MyApplication()
 		return;
 	}
 
-	Mat current_frame, selective_running_average_background,
-		temp_selective_running_average_background, selective_running_average_difference,
-		selective_running_average_foreground_mask, selective_running_average_foreground_image;
+	Mat current_frame, selective_running_average_background, selective_running_average_foreground_image;
 	double running_average_learning_rate = 0.01;
 	video.set(cv::CAP_PROP_POS_FRAMES, starting_frame);
 	video >> current_frame;
@@ -85,38 +102,37 @@ void MyApplication()
 	{
 		Mat processed_img = current_frame.clone();
 		applyProcessingToFrame(current_frame, processed_img, true);	
-		// Running Average with selective update
-		vector<Mat> selective_running_average_planes(3);
-		// Find Foreground mask
-		selective_running_average_background.convertTo(temp_selective_running_average_background, CV_8U);
-		absdiff(temp_selective_running_average_background, processed_img, selective_running_average_difference);
-		split(selective_running_average_difference, selective_running_average_planes);
-		// Determine foreground points as any point with an average difference of more than 30 over all channels:
-		Mat temp_sum = (selective_running_average_planes[0] / 3 + selective_running_average_planes[1] / 3 + selective_running_average_planes[2] / 3);
+
+		Mat temp_selective_running_average_background;
+		vector<Mat> selective_running_average_planes = findForegroundMask(selective_running_average_background, temp_selective_running_average_background, processed_img);
+		
+		// Sum up points and run Otsu thresholding to obtain the foreground.
+		// TODO compare with all /3 and use 30 cst thresh
+		Mat temp_sum = (selective_running_average_planes[0] + selective_running_average_planes[1] + selective_running_average_planes[2]);
+		Mat selective_running_average_foreground_mask;
 		threshold(temp_sum, selective_running_average_foreground_mask, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
-		imshow("Test tresh", selective_running_average_foreground_mask);
+		// Run a close operation on the result.
+		Mat closed_image;
+		morphologyEx(selective_running_average_foreground_mask, selective_running_average_foreground_mask, MORPH_CLOSE, Mat());
+		/*
+		TODO compare both techinques see if 1 is better.
 		Mat opened_image;
 		morphologyEx(selective_running_average_foreground_mask, opened_image, MORPH_OPEN, Mat());
-		imshow("after open", opened_image);
-		selective_running_average_foreground_mask = opened_image;
+		*/
 
-		// updateAvgSelectiveBackground();
 		// Update background
 		vector<Mat> input_planes(3);
 		split(processed_img, input_planes);
 		split(selective_running_average_background, selective_running_average_planes);
-		accumulateWeighted(input_planes[0], selective_running_average_planes[0], running_average_learning_rate, selective_running_average_foreground_mask);
-		accumulateWeighted(input_planes[1], selective_running_average_planes[1], running_average_learning_rate, selective_running_average_foreground_mask);
-		accumulateWeighted(input_planes[2], selective_running_average_planes[2], running_average_learning_rate, selective_running_average_foreground_mask);
-		invertImage(selective_running_average_foreground_mask, selective_running_average_foreground_mask);
+		updateAvgSelectiveBackground(input_planes, selective_running_average_planes, selective_running_average_foreground_mask);
 
+		// Copy the pixels from the current frame into the foreground image using the selecting running average foreground mask.
 		selective_running_average_foreground_image.setTo(Scalar(0, 0, 0));
 		current_frame.copyTo(selective_running_average_foreground_image, selective_running_average_foreground_mask);
+		
 		Mat histo_img;
 		MatND* colour_histogram = computeHistogram(selective_running_average_foreground_image, histo_img);
 		imshow("histo", histo_img);
-
-		char c = cv::waitKey(250);
 
 		char frame_str[100];
 		sprintf(frame_str, "Frame = %d", frame_count);
@@ -124,6 +140,7 @@ void MyApplication()
 		Mat selective_output = JoinImagesHorizontally(temp_selective_output, "", selective_running_average_foreground_image, "Foreground", 4);
 		imshow("Selective Running Average Background Model", selective_output);
 		video >> current_frame;
+		char c = cv::waitKey(250);
 	}
 	cv::destroyAllWindows();
 
