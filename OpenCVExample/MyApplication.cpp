@@ -3,10 +3,9 @@
 #include <fstream>
 #include <list>
 #include <experimental/filesystem> // C++-standard header file name
-#include <filesystem> // Microsoft-specific implementation header file name
+#include <filesystem>			   // Microsoft-specific implementation header file name
 using namespace std::experimental::filesystem::v1;
 using namespace std;
-
 
 // Sign must be at least 100x100
 #define MINIMUM_SIGN_SIDE 100
@@ -22,20 +21,21 @@ class ObjectAndLocation
 {
 public:
 	ObjectAndLocation(string object_name, Point top_left, Point top_right, Point bottom_right, Point bottom_left, Mat object_image);
-	ObjectAndLocation(FileNode& node);
-	void write(FileStorage& fs);
-	void read(FileNode& node);
-	Mat& getImage();
+	ObjectAndLocation(FileNode &node);
+	void write(FileStorage &fs);
+	void read(FileNode &node);
+	Mat &getImage();
 	string getName();
 	void setName(string new_name);
 	string getVerticesString();
-	void DrawObject(Mat* display_image, Scalar& colour);
+	void DrawObject(Mat *display_image, Scalar &colour);
 	double getMinimumSideLength();
 	double getArea();
-	void getVertice(int index, int& x, int& y);
-	void setImage(Mat image);   // *** Student should add any initialisation (of their images or features; see private data below) they wish into this method.
-	double compareObjects(ObjectAndLocation* otherObject);  // *** Student should write code to compare objects using chosen method.
-	bool OverlapsWith(ObjectAndLocation* other_object);
+	void getVertice(int index, int &x, int &y);
+	void setImage(Mat image);							   // *** Student should add any initialisation (of their images or features; see private data below) they wish into this method.
+	double compareObjects(ObjectAndLocation *otherObject); // *** Student should write code to compare objects using chosen method.
+	bool OverlapsWith(ObjectAndLocation *other_object);
+
 private:
 	string object_name;
 	Mat image;
@@ -48,18 +48,20 @@ class AnnotatedImages;
 class ImageWithObjects
 {
 	friend class AnnotatedImages;
+
 public:
 	ImageWithObjects(string passed_filename);
-	ImageWithObjects(FileNode& node);
-	virtual void LocateAndAddAllObjects(AnnotatedImages& training_images) = 0;
-	ObjectAndLocation* addObject(string object_name, int top_left_column, int top_left_row, int top_right_column, int top_right_row,
-		int bottom_right_column, int bottom_right_row, int bottom_left_column, int bottom_left_row, Mat& image);
-	void write(FileStorage& fs);
-	void read(FileNode& node);
-	ObjectAndLocation* getObject(int index);
+	ImageWithObjects(FileNode &node);
+	virtual void LocateAndAddAllObjects(AnnotatedImages &training_images) = 0;
+	ObjectAndLocation *addObject(string object_name, int top_left_column, int top_left_row, int top_right_column, int top_right_row,
+								 int bottom_right_column, int bottom_right_row, int bottom_left_column, int bottom_left_row, Mat &image);
+	void write(FileStorage &fs);
+	void read(FileNode &node);
+	ObjectAndLocation *getObject(int index);
 	void extractAndSetObjectImage(ObjectAndLocation *new_object);
 	string ExtractObjectName(string filenamestr);
-	void FindBestMatch(ObjectAndLocation* new_object, string& object_name, double& match_value);
+	void FindBestMatch(ObjectAndLocation *new_object, string &object_name, double &match_value);
+
 protected:
 	string filename;
 	Mat image;
@@ -70,8 +72,8 @@ class ImageWithBlueSignObjects : public ImageWithObjects
 {
 public:
 	ImageWithBlueSignObjects(string passed_filename);
-	ImageWithBlueSignObjects(FileNode& node); 
-	void LocateAndAddAllObjects(AnnotatedImages& training_images);  // *** Student needs to develop this routine and add in objects using the addObject method
+	ImageWithBlueSignObjects(FileNode &node);
+	void LocateAndAddAllObjects(AnnotatedImages &training_images); // *** Student needs to develop this routine and add in objects using the addObject method
 };
 
 class ConfusionMatrix;
@@ -82,19 +84,20 @@ public:
 	AnnotatedImages(string directory_name);
 	AnnotatedImages();
 	void addAnnotatedImage(ImageWithObjects &annotated_image);
-	void write(FileStorage& fs);
-	void read(FileStorage& fs);
-	void read(FileNode& node);
+	void write(FileStorage &fs);
+	void read(FileStorage &fs);
+	void read(FileNode &node);
 	void read(string filename);
-	void LocateAndAddAllObjects(AnnotatedImages& training_images);
-	void FindBestMatch(ObjectAndLocation* new_object);
+	void LocateAndAddAllObjects(AnnotatedImages &training_images);
+	void FindBestMatch(ObjectAndLocation *new_object);
 	Mat getImageOfAllObjects(int break_after = 7);
-	void CompareObjectsWithGroundTruth(AnnotatedImages& training_images, AnnotatedImages& ground_truth, ConfusionMatrix& results);
-	ImageWithObjects* getAnnotatedImage(int index);
-	ImageWithObjects* FindAnnotatedImage(string filename_to_find);
+	void CompareObjectsWithGroundTruth(AnnotatedImages &training_images, AnnotatedImages &ground_truth, ConfusionMatrix &results);
+	ImageWithObjects *getAnnotatedImage(int index);
+	ImageWithObjects *FindAnnotatedImage(string filename_to_find);
+
 public:
 	string name;
-	vector<ImageWithObjects*> annotated_images;
+	vector<ImageWithObjects *> annotated_images;
 };
 
 class ConfusionMatrix
@@ -105,12 +108,13 @@ public:
 	void AddFalseNegative(string ground_truth);
 	void AddFalsePositive(string recognised_as);
 	void Print();
+
 private:
 	void AddObjectClass(string object_class_name);
 	int getObjectClassIndex(string object_class_name);
 	vector<string> class_names;
 	int confusion_size;
-	int** confusion_matrix;
+	int **confusion_matrix;
 	int false_index;
 	int tp, fp, fn;
 };
@@ -124,14 +128,16 @@ ObjectAndLocation::ObjectAndLocation(string passed_object_name, Point top_left, 
 	vertices.push_back(bottom_left);
 	setImage(object_image);
 }
-ObjectAndLocation::ObjectAndLocation(FileNode& node)
+ObjectAndLocation::ObjectAndLocation(FileNode &node)
 {
 	read(node);
 }
-void ObjectAndLocation::write(FileStorage& fs)
+void ObjectAndLocation::write(FileStorage &fs)
 {
-	fs << "{" << "nameStr" << object_name;
-	fs << "coordinates" << "[";
+	fs << "{"
+	   << "nameStr" << object_name;
+	fs << "coordinates"
+	   << "[";
 	for (int i = 0; i < vertices.size(); ++i)
 	{
 		fs << "[:" << vertices[i].x << vertices[i].y << "]";
@@ -139,7 +145,7 @@ void ObjectAndLocation::write(FileStorage& fs)
 	fs << "]";
 	fs << "}";
 }
-void ObjectAndLocation::read(FileNode& node)
+void ObjectAndLocation::read(FileNode &node)
 {
 	node["nameStr"] >> object_name;
 	FileNode data = node["coordinates"];
@@ -150,12 +156,13 @@ void ObjectAndLocation::read(FileNode& node)
 
 		Point2i point;
 		FileNodeIterator itPt = pt.begin();
-		point.x = *itPt; ++itPt;
+		point.x = *itPt;
+		++itPt;
 		point.y = *itPt;
 		vertices.push_back(point);
 	}
 }
-Mat& ObjectAndLocation::getImage()
+Mat &ObjectAndLocation::getImage()
 {
 	return image;
 }
@@ -174,7 +181,7 @@ string ObjectAndLocation::getVerticesString()
 		result.append("(" + to_string(vertices[index].x) + " " + to_string(vertices[index].y) + ") ");
 	return result;
 }
-void ObjectAndLocation::DrawObject(Mat* display_image, Scalar& colour)
+void ObjectAndLocation::DrawObject(Mat *display_image, Scalar &colour)
 {
 	writeText(*display_image, object_name, vertices[0].y - 8, vertices[0].x + 8, colour, 2.0, 4);
 	polylines(*display_image, vertices, true, colour, 8);
@@ -194,7 +201,7 @@ double ObjectAndLocation::getArea()
 {
 	return contourArea(vertices);
 }
-void ObjectAndLocation::getVertice(int index, int& x, int& y)
+void ObjectAndLocation::getVertice(int index, int &x, int &y)
 {
 	if ((vertices.size() < index) || (index < 0))
 		x = y = -1;
@@ -211,23 +218,26 @@ ImageWithObjects::ImageWithObjects(string passed_filename)
 	cout << "Opening " << filename << endl;
 	image = imread(filename, -1);
 }
-ImageWithObjects::ImageWithObjects(FileNode& node)
+ImageWithObjects::ImageWithObjects(FileNode &node)
 {
 	read(node);
 }
-ObjectAndLocation* ImageWithObjects::addObject(string object_name, int top_left_column, int top_left_row, int top_right_column, int top_right_row,
-	int bottom_right_column, int bottom_right_row, int bottom_left_column, int bottom_left_row, Mat& image)
+ObjectAndLocation *ImageWithObjects::addObject(string object_name, int top_left_column, int top_left_row, int top_right_column, int top_right_row,
+											   int bottom_right_column, int bottom_right_row, int bottom_left_column, int bottom_left_row, Mat &image)
 {
 	ObjectAndLocation new_object(object_name, Point(top_left_column, top_left_row), Point(top_right_column, top_right_row), Point(bottom_right_column, bottom_right_row), Point(bottom_left_column, bottom_left_row), image);
 	objects.push_back(new_object);
 	return &(objects[objects.size() - 1]);
 }
-void ImageWithObjects::write(FileStorage& fs)
+void ImageWithObjects::write(FileStorage &fs)
 {
-	fs << "{" << "Filename" << filename << "Objects" << "[";
+	fs << "{"
+	   << "Filename" << filename << "Objects"
+	   << "[";
 	for (int index = 0; index < objects.size(); index++)
 		objects[index].write(fs);
-	fs << "]" << "}";
+	fs << "]"
+	   << "}";
 }
 void ImageWithObjects::extractAndSetObjectImage(ObjectAndLocation *new_object)
 {
@@ -238,15 +248,15 @@ void ImageWithObjects::extractAndSetObjectImage(ObjectAndLocation *new_object)
 	new_object->getVertice(1, x[1], y[1]);
 	new_object->getVertice(2, x[2], y[2]);
 	new_object->getVertice(3, x[3], y[3]);
-	Point2f source_points[4] = { { ((float)x[0]), ((float)y[0]) },{ ((float)x[1]), ((float)y[1]) },{ ((float)x[2]), ((float)y[2]) },{ ((float)x[3]), ((float)y[3]) } };
-	Point2f destination_points[4] = { { 0.0, 0.0 },{ STANDARD_SIGN_WIDTH_AND_HEIGHT - 1, 0.0 },{ STANDARD_SIGN_WIDTH_AND_HEIGHT - 1, STANDARD_SIGN_WIDTH_AND_HEIGHT - 1 },{ 0.0, STANDARD_SIGN_WIDTH_AND_HEIGHT - 1 } };
+	Point2f source_points[4] = {{((float)x[0]), ((float)y[0])}, {((float)x[1]), ((float)y[1])}, {((float)x[2]), ((float)y[2])}, {((float)x[3]), ((float)y[3])}};
+	Point2f destination_points[4] = {{0.0, 0.0}, {STANDARD_SIGN_WIDTH_AND_HEIGHT - 1, 0.0}, {STANDARD_SIGN_WIDTH_AND_HEIGHT - 1, STANDARD_SIGN_WIDTH_AND_HEIGHT - 1}, {0.0, STANDARD_SIGN_WIDTH_AND_HEIGHT - 1}};
 	perspective_matrix = getPerspectiveTransform(source_points, destination_points);
 	warpPerspective(image, perspective_warped_image, perspective_matrix, perspective_warped_image.size());
 	new_object->setImage(perspective_warped_image);
 }
-void ImageWithObjects::read(FileNode& node)
+void ImageWithObjects::read(FileNode &node)
 {
-	filename = (string) node["Filename"];
+	filename = (string)node["Filename"];
 	image = imread(filename, -1);
 	FileNode images_node = node["Objects"];
 	if (images_node.type() == FileNode::SEQ)
@@ -260,13 +270,14 @@ void ImageWithObjects::read(FileNode& node)
 		}
 	}
 }
-ObjectAndLocation* ImageWithObjects::getObject(int index)
+ObjectAndLocation *ImageWithObjects::getObject(int index)
 {
 	if ((index < 0) || (index >= objects.size()))
 		return NULL;
-	else return &(objects[index]);
+	else
+		return &(objects[index]);
 }
-void ImageWithObjects::FindBestMatch(ObjectAndLocation* new_object, string& object_name, double& match_value)
+void ImageWithObjects::FindBestMatch(ObjectAndLocation *new_object, string &object_name, double &match_value)
 {
 	for (int index = 0; (index < objects.size()); index++)
 	{
@@ -291,16 +302,12 @@ string ImageWithObjects::ExtractObjectName(string filenamestr)
 	return object_name;
 }
 
-
-ImageWithBlueSignObjects::ImageWithBlueSignObjects(string passed_filename) :
-	ImageWithObjects(passed_filename)
+ImageWithBlueSignObjects::ImageWithBlueSignObjects(string passed_filename) : ImageWithObjects(passed_filename)
 {
 }
-ImageWithBlueSignObjects::ImageWithBlueSignObjects(FileNode& node) :
-	ImageWithObjects(node)
+ImageWithBlueSignObjects::ImageWithBlueSignObjects(FileNode &node) : ImageWithObjects(node)
 {
 }
-
 
 AnnotatedImages::AnnotatedImages(string directory_name)
 {
@@ -319,21 +326,23 @@ void AnnotatedImages::addAnnotatedImage(ImageWithObjects &annotated_image)
 	annotated_images.push_back(&annotated_image);
 }
 
-void AnnotatedImages::write(FileStorage& fs)
+void AnnotatedImages::write(FileStorage &fs)
 {
 	fs << "AnnotatedImages";
 	fs << "{";
-	fs << "name" << name << "ImagesAndObjects" << "[";
+	fs << "name" << name << "ImagesAndObjects"
+	   << "[";
 	for (int index = 0; index < annotated_images.size(); index++)
 		annotated_images[index]->write(fs);
-	fs << "]" << "}";
+	fs << "]"
+	   << "}";
 }
-void AnnotatedImages::read(FileStorage& fs)
+void AnnotatedImages::read(FileStorage &fs)
 {
 	FileNode node = fs.getFirstTopLevelNode();
 	read(node);
 }
-void AnnotatedImages::read(FileNode& node)
+void AnnotatedImages::read(FileNode &node)
 {
 	name = (string)node["name"];
 	FileNode images_node = node["ImagesAndObjects"];
@@ -342,7 +351,7 @@ void AnnotatedImages::read(FileNode& node)
 		for (FileNodeIterator it = images_node.begin(); it != images_node.end(); ++it)
 		{
 			FileNode current_node = *it;
-			ImageWithBlueSignObjects* new_image_with_objects = new ImageWithBlueSignObjects(current_node);
+			ImageWithBlueSignObjects *new_image_with_objects = new ImageWithBlueSignObjects(current_node);
 			annotated_images.push_back(new_image_with_objects);
 		}
 	}
@@ -352,14 +361,14 @@ void AnnotatedImages::read(string filename)
 	ImageWithBlueSignObjects *new_image_with_objects = new ImageWithBlueSignObjects(filename);
 	annotated_images.push_back(new_image_with_objects);
 }
-void AnnotatedImages::LocateAndAddAllObjects(AnnotatedImages& training_images)
+void AnnotatedImages::LocateAndAddAllObjects(AnnotatedImages &training_images)
 {
 	for (int index = 0; index < annotated_images.size(); index++)
 	{
 		annotated_images[index]->LocateAndAddAllObjects(training_images);
 	}
 }
-void AnnotatedImages::FindBestMatch(ObjectAndLocation* new_object) //Mat& perspective_warped_image, string& object_name, double& match_value)
+void AnnotatedImages::FindBestMatch(ObjectAndLocation *new_object) //Mat& perspective_warped_image, string& object_name, double& match_value)
 {
 	double match_value = -1.0;
 	string object_name = "Unknown";
@@ -388,7 +397,8 @@ void AnnotatedImages::FindBestMatch(ObjectAndLocation* new_object) //Mat& perspe
 	}
 	if (temp_second_best_match / temp_best_match < REQUIRED_RATIO_OF_BEST_TO_SECOND_BEST)
 		new_object->setName("Unknown");
-	else new_object->setName(temp_best_name);
+	else
+		new_object->setName(temp_best_name);
 }
 
 Mat AnnotatedImages::getImageOfAllObjects(int break_after)
@@ -400,7 +410,7 @@ Mat AnnotatedImages::getImageOfAllObjects(int break_after)
 	string blank("");
 	for (int index = 0; (index < annotated_images.size()); index++)
 	{
-		ObjectAndLocation* current_object = NULL;
+		ObjectAndLocation *current_object = NULL;
 		int object_index = 0;
 		while ((current_object = (annotated_images[index])->getObject(object_index)) != NULL)
 		{
@@ -435,21 +445,23 @@ Mat AnnotatedImages::getImageOfAllObjects(int break_after)
 	}
 	else if (count < break_after)
 		return output;
-	else {
+	else
+	{
 		Mat temp_rows = JoinImagesVertically(all_rows_so_far, blank, output, blank, 0);
 		all_rows_so_far = temp_rows.clone();
 		return all_rows_so_far;
 	}
 }
 
-ImageWithObjects* AnnotatedImages::getAnnotatedImage(int index)
+ImageWithObjects *AnnotatedImages::getAnnotatedImage(int index)
 {
 	if ((index >= 0) && (index < annotated_images.size()))
 		return annotated_images[index];
-	else return NULL;
+	else
+		return NULL;
 }
 
-ImageWithObjects* AnnotatedImages::FindAnnotatedImage(string filename_to_find)
+ImageWithObjects *AnnotatedImages::FindAnnotatedImage(string filename_to_find)
 {
 	for (int index = 0; (index < annotated_images.size()); index++)
 	{
@@ -465,7 +477,9 @@ void MyApplication()
 	FileStorage training_file("BlueSignsTraining.xml", FileStorage::READ);
 	if (!training_file.isOpened())
 	{
-		cout << "Could not open the file: \"" << "BlueSignsTraining.xml" << "\"" << endl;
+		cout << "Could not open the file: \""
+			 << "BlueSignsTraining.xml"
+			 << "\"" << endl;
 	}
 	else
 	{
@@ -481,7 +495,9 @@ void MyApplication()
 	FileStorage ground_truth_file("BlueSignsGroundTruth.xml", FileStorage::READ);
 	if (!ground_truth_file.isOpened())
 	{
-		cout << "Could not open the file: \"" << "BlueSignsGroundTruth.xml" << "\"" << endl;
+		cout << "Could not open the file: \""
+			 << "BlueSignsGroundTruth.xml"
+			 << "\"" << endl;
 	}
 	else
 	{
@@ -498,7 +514,9 @@ void MyApplication()
 	FileStorage unknowns_file("BlueSignsTesting.xml", FileStorage::WRITE);
 	if (!unknowns_file.isOpened())
 	{
-		cout << "Could not open the file: \"" << "BlueSignsTesting.xml" << "\"" << endl;
+		cout << "Could not open the file: \""
+			 << "BlueSignsTesting.xml"
+			 << "\"" << endl;
 	}
 	else
 	{
@@ -514,7 +532,6 @@ void MyApplication()
 	results.Print();
 }
 
-
 bool PointInPolygon(Point2i point, vector<Point2i> vertices)
 {
 	int i, j, nvert = vertices.size();
@@ -525,14 +542,13 @@ bool PointInPolygon(Point2i point, vector<Point2i> vertices)
 		if ((vertices[i].x == point.x) && (vertices[i].y == point.y))
 			return true;
 		if (((vertices[i].y >= point.y) != (vertices[j].y >= point.y)) &&
-			(point.x <= (vertices[j].x - vertices[i].x) * (point.y - vertices[i].y) / (vertices[j].y - vertices[i].y) + vertices[i].x)
-			)
+			(point.x <= (vertices[j].x - vertices[i].x) * (point.y - vertices[i].y) / (vertices[j].y - vertices[i].y) + vertices[i].x))
 			inside = !inside;
 	}
 	return inside;
 }
 
-bool ObjectAndLocation::OverlapsWith(ObjectAndLocation* other_object)
+bool ObjectAndLocation::OverlapsWith(ObjectAndLocation *other_object)
 {
 	double area = contourArea(vertices);
 	double other_area = contourArea(other_object->vertices);
@@ -556,7 +572,7 @@ bool ObjectAndLocation::OverlapsWith(ObjectAndLocation* other_object)
 	else if ((count_points_inside == 0) && (count_other_points_inside == 0))
 		overlap_area = 0.0;
 	else
-	{   // There is a partial overlap of the polygons.
+	{ // There is a partial overlap of the polygons.
 		// Find min & max x & y for the current object
 		int min_x = vertices[0].x, min_y = vertices[0].y, max_x = vertices[0].x, max_y = vertices[0].y;
 		for (int index = 0; (index < vertices.size()); index++)
@@ -583,10 +599,14 @@ bool ObjectAndLocation::OverlapsWith(ObjectAndLocation* other_object)
 				max_y2 = other_object->vertices[index].y;
 		}
 		// We only need the maximum overlapping bounding boxes
-		if (min_x < min_x2) min_x = min_x2;
-		if (max_x > max_x2) max_x = max_x2;
-		if (min_y < min_y2) min_y = min_y2;
-		if (max_y > max_y2) max_y = max_y2;
+		if (min_x < min_x2)
+			min_x = min_x2;
+		if (max_x > max_x2)
+			max_x = max_x2;
+		if (min_y < min_y2)
+			min_y = min_y2;
+		if (max_y > max_y2)
+			max_y = max_y2;
 		// For all points
 		overlap_area = 0;
 		Point2i current_point;
@@ -601,37 +621,37 @@ bool ObjectAndLocation::OverlapsWith(ObjectAndLocation* other_object)
 				{
 					if ((PointInPolygon(current_point, vertices)) && (PointInPolygon(current_point, other_object->vertices)))
 						overlap_area++;
-					else all_points_inside = false;
+					else
+						all_points_inside = false;
 				}
 			for (current_point.y = min_y + distance_from_edge + 1; (current_point.y <= (max_y - distance_from_edge - 1)); current_point.y++)
 				for (current_point.x = min_x + distance_from_edge; (current_point.x <= max_x - distance_from_edge); current_point.x += max_x - 2 * distance_from_edge - min_x)
 				{
 					if ((PointInPolygon(current_point, vertices)) && (PointInPolygon(current_point, other_object->vertices)))
 						overlap_area++;
-					else all_points_inside = false;
+					else
+						all_points_inside = false;
 				}
 		}
 		if (all_points_inside)
 			overlap_area += (max_x - min_x + 1 - 2 * (distance_from_edge + 1)) * (max_y - min_y + 1 - 2 * (distance_from_edge + 1));
 	}
-	double percentage_overlap = (overlap_area*2.0) / (area + other_area);
+	double percentage_overlap = (overlap_area * 2.0) / (area + other_area);
 	return (percentage_overlap >= REQUIRED_OVERLAP);
 }
 
-
-
-void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_images, AnnotatedImages& ground_truth, ConfusionMatrix& results)
+void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages &training_images, AnnotatedImages &ground_truth, ConfusionMatrix &results)
 {
 	// For every annotated image in ground_truth, find the corresponding image in this
 	for (int ground_truth_image_index = 0; ground_truth_image_index < ground_truth.annotated_images.size(); ground_truth_image_index++)
 	{
-		ImageWithObjects* current_annotated_ground_truth_image = ground_truth.annotated_images[ground_truth_image_index];
-		ImageWithObjects* current_annotated_recognition_image = FindAnnotatedImage(current_annotated_ground_truth_image->filename);
+		ImageWithObjects *current_annotated_ground_truth_image = ground_truth.annotated_images[ground_truth_image_index];
+		ImageWithObjects *current_annotated_recognition_image = FindAnnotatedImage(current_annotated_ground_truth_image->filename);
 		if (current_annotated_recognition_image != NULL)
 		{
-			ObjectAndLocation* current_ground_truth_object = NULL;
+			ObjectAndLocation *current_ground_truth_object = NULL;
 			int ground_truth_object_index = 0;
-			Mat* display_image = NULL;
+			Mat *display_image = NULL;
 			if (!current_annotated_recognition_image->image.empty())
 			{
 				display_image = &(current_annotated_recognition_image->image);
@@ -643,9 +663,9 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 					(current_ground_truth_object->getArea() >= MINIMUM_SIGN_AREA))
 				{
 					// Determine the number of overlapping objects (correct & incorrect)
-					vector<ObjectAndLocation*> overlapping_correct_objects;
-					vector<ObjectAndLocation*> overlapping_incorrect_objects;
-					ObjectAndLocation* current_recognised_object = NULL;
+					vector<ObjectAndLocation *> overlapping_correct_objects;
+					vector<ObjectAndLocation *> overlapping_incorrect_objects;
+					ObjectAndLocation *current_recognised_object = NULL;
 					int recognised_object_index = 0;
 					// For each object in this.annotated_image
 					while ((current_recognised_object = current_annotated_recognition_image->getObject(recognised_object_index)) != NULL)
@@ -655,7 +675,8 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 							{
 								if (current_ground_truth_object->getName().compare(current_recognised_object->getName()) == 0)
 									overlapping_correct_objects.push_back(current_recognised_object);
-								else overlapping_incorrect_objects.push_back(current_recognised_object);
+								else
+									overlapping_incorrect_objects.push_back(current_recognised_object);
 							}
 						recognised_object_index++;
 					}
@@ -669,7 +690,8 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 						results.AddFalseNegative(current_ground_truth_object->getName());
 						cout << current_annotated_ground_truth_image->filename << ", " << current_ground_truth_object->getName() << ", (False Negative) , " << current_ground_truth_object->getVerticesString() << endl;
 					}
-					else {
+					else
+					{
 						for (int index = 0; (index < overlapping_correct_objects.size()); index++)
 						{
 							Scalar colour(0x00, 0xFF, 0x00);
@@ -690,7 +712,8 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 								overlapping_incorrect_objects[index]->DrawObject(display_image, colour);
 							}
 							results.AddMatch(current_ground_truth_object->getName(), overlapping_incorrect_objects[index]->getName(), (index > 0));
-							cout << current_annotated_ground_truth_image->filename << ", " << current_ground_truth_object->getName() << ", (Mismatch), " << overlapping_incorrect_objects[index]->getName() << " , " << current_ground_truth_object->getVerticesString() << endl;;
+							cout << current_annotated_ground_truth_image->filename << ", " << current_ground_truth_object->getName() << ", (Mismatch), " << overlapping_incorrect_objects[index]->getName() << " , " << current_ground_truth_object->getVerticesString() << endl;
+							;
 						}
 					}
 				}
@@ -704,7 +727,7 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 			//					Don't do anything (as already done above)
 			//			If no overlapping objects.
 			//				Update the confusion table (with a False Positive)
-			ObjectAndLocation* current_recognised_object = NULL;
+			ObjectAndLocation *current_recognised_object = NULL;
 			int recognised_object_index = 0;
 			// For each object in this.annotated_image
 			while ((current_recognised_object = current_annotated_recognition_image->getObject(recognised_object_index)) != NULL)
@@ -713,8 +736,8 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 					(current_recognised_object->getArea() >= MINIMUM_SIGN_AREA))
 				{
 					// Determine the number of overlapping objects (correct & incorrect)
-					vector<ObjectAndLocation*> overlapping_objects;
-					ObjectAndLocation* current_ground_truth_object = NULL;
+					vector<ObjectAndLocation *> overlapping_objects;
+					ObjectAndLocation *current_ground_truth_object = NULL;
 					int ground_truth_object_index = 0;
 					// For each object in ground_truth.annotated_image
 					while ((current_ground_truth_object = current_annotated_ground_truth_image->getObject(ground_truth_object_index)) != NULL)
@@ -755,11 +778,11 @@ void AnnotatedImages::CompareObjectsWithGroundTruth(AnnotatedImages& training_im
 ConfusionMatrix::ConfusionMatrix(AnnotatedImages training_images)
 {
 	// Extract object class names
-	ImageWithObjects* current_annnotated_image = NULL;
+	ImageWithObjects *current_annnotated_image = NULL;
 	int image_index = 0;
 	while ((current_annnotated_image = training_images.getAnnotatedImage(image_index)) != NULL)
 	{
-		ObjectAndLocation* current_object = NULL;
+		ObjectAndLocation *current_object = NULL;
 		int object_index = 0;
 		while ((current_object = current_annnotated_image->getObject(object_index)) != NULL)
 		{
@@ -770,7 +793,7 @@ ConfusionMatrix::ConfusionMatrix(AnnotatedImages training_images)
 	}
 	// Create and initialise confusion matrix
 	confusion_size = class_names.size() + 1;
-	confusion_matrix = new int*[confusion_size];
+	confusion_matrix = new int *[confusion_size];
 	for (int index = 0; (index < confusion_size); index++)
 	{
 		confusion_matrix[index] = new int[confusion_size];
@@ -793,7 +816,8 @@ int ConfusionMatrix::getObjectClassIndex(string object_class_name)
 		;
 	if (index < class_names.size())
 		return index;
-	else return -1;
+	else
+		return -1;
 }
 void ConfusionMatrix::AddMatch(string ground_truth, string recognised_as, bool duplicate)
 {
@@ -804,7 +828,8 @@ void ConfusionMatrix::AddMatch(string ground_truth, string recognised_as, bool d
 		confusion_matrix[getObjectClassIndex(ground_truth)][getObjectClassIndex(recognised_as)]++;
 		if (ground_truth.compare(recognised_as) == 0)
 			tp++;
-		else {
+		else
+		{
 			fp++;
 			fn++;
 		}
@@ -822,29 +847,32 @@ void ConfusionMatrix::AddFalsePositive(string recognised_as)
 }
 void ConfusionMatrix::Print()
 {
-	cout << ",,,Recognised as:" << endl << ",,";
+	cout << ",,,Recognised as:" << endl
+		 << ",,";
 	for (int recognised_as_index = 0; recognised_as_index < confusion_size; recognised_as_index++)
 		if (recognised_as_index < confusion_size - 1)
 			cout << class_names[recognised_as_index] << ",";
-		else cout << "False Negative,";
+		else
+			cout << "False Negative,";
+	cout << endl;
+	for (int ground_truth_index = 0; (ground_truth_index <= class_names.size()); ground_truth_index++)
+	{
+		if (ground_truth_index < confusion_size - 1)
+			cout << "Ground Truth," << class_names[ground_truth_index] << ",";
+		else
+			cout << "Ground Truth,False Positive,";
+		for (int recognised_as_index = 0; recognised_as_index < confusion_size; recognised_as_index++)
+			cout << confusion_matrix[ground_truth_index][recognised_as_index] << ",";
 		cout << endl;
-		for (int ground_truth_index = 0; (ground_truth_index <= class_names.size()); ground_truth_index++)
-		{
-			if (ground_truth_index < confusion_size - 1)
-				cout << "Ground Truth," << class_names[ground_truth_index] << ",";
-			else cout << "Ground Truth,False Positive,";
-			for (int recognised_as_index = 0; recognised_as_index < confusion_size; recognised_as_index++)
-				cout << confusion_matrix[ground_truth_index][recognised_as_index] << ",";
-			cout << endl;
-		}
-		double precision = ((double)tp) / ((double)(tp + fp));
-		double recall = ((double)tp) / ((double)(tp + fn));
-		double f1 = 2.0*precision*recall / (precision + recall);
-		cout << endl << "Precision = " << precision << endl << "Recall = " << recall << endl << "F1 = " << f1 << endl;
+	}
+	double precision = ((double)tp) / ((double)(tp + fp));
+	double recall = ((double)tp) / ((double)(tp + fn));
+	double f1 = 2.0 * precision * recall / (precision + recall);
+	cout << endl
+		 << "Precision = " << precision << endl
+		 << "Recall = " << recall << endl
+		 << "F1 = " << f1 << endl;
 }
-
-
-
 
 void ObjectAndLocation::setImage(Mat object_image)
 {
@@ -852,15 +880,13 @@ void ObjectAndLocation::setImage(Mat object_image)
 	// *** Student should add any initialisation (of their images or features; see private data below) they wish into this method.
 }
 
-
-void ImageWithBlueSignObjects::LocateAndAddAllObjects(AnnotatedImages& training_images)
+void ImageWithBlueSignObjects::LocateAndAddAllObjects(AnnotatedImages &training_images)
 {
 	// *** Student needs to develop this routine and add in objects using the addObject method
 }
 
-
 #define BAD_MATCHING_VALUE 1000000000.0;
-double ObjectAndLocation::compareObjects(ObjectAndLocation* otherObject)
+double ObjectAndLocation::compareObjects(ObjectAndLocation *otherObject)
 {
 	// *** Student should write code to compare objects using chosen method.
 	// Please bear in mind that ImageWithObjects::FindBestMatch assumes that the lower the value the better.  Feel free to change this.
