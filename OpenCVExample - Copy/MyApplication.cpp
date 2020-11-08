@@ -142,7 +142,7 @@ void MyApplication()
 	}
 
 	VideoCapture& video = videos[POSTBOX_VIDEO_INDEX];
-	int starting_frame = 1;
+	int starting_frame = 0;
 
 	if (!video.isOpened()) {
 		cout << "Video file is not open: " << filename << endl;
@@ -221,7 +221,7 @@ void MyApplication()
 		Mat selective_output = JoinImagesHorizontally(temp_selective_output, "", selective_running_average_foreground_image, "Foreground", 4);
 		imshow("Selective Running Average Background Model", selective_output);
 		video >> current_frame;
-		char c = cv::waitKey(300);
+		char c = cv::waitKey(1000);
 	}
 	cv::destroyAllWindows();
 
