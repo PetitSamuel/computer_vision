@@ -1,5 +1,6 @@
 #include "Utilities.h"
 #include "opencv2/video.hpp"
+#include <fstream>
 
 // Assignment vars
 #define POSTBOX_VIDEO_INDEX 0
@@ -19,6 +20,11 @@ int PostboxLocations[NUMBER_OF_POSTBOXES][8] = {
 #define POSTBOX_BOTTOM_LEFT_ROW 5
 #define POSTBOX_BOTTOM_RIGHT_COLUMN 6
 #define POSTBOX_BOTTOM_RIGHT_ROW 7
+
+#define TRUE_POSITIVE 0
+#define TRUE_NEGATIVE 1
+#define FALSE_POSITIVE 2
+#define FALSE_NEGATIVE 3
 
 MatND* computeHistogram(Mat& image, Mat& histo_img) {
 	const int* channel_numbers = { 0 };
@@ -46,7 +52,6 @@ void applyProcessingToFrame(Mat& src, Mat& dst, bool applyBlur = false) {
 }
 
 vector<Mat> findForegroundMask(Mat& src_background, Mat& temp_selective_running_average_background, Mat& processed_img) {
-	// Find Foreground mask
 	Mat selective_running_average_difference;
 	vector<Mat> selective_running_average_planes(3);
 	src_background.convertTo(temp_selective_running_average_background, CV_8U);
@@ -66,17 +71,17 @@ void updateAvgSelectiveBackground(vector<Mat> input_planes, vector<Mat> selectiv
 double computeCmpHist(MatND* base_histo, MatND* cmp_histo, int method, int nb_chan) {
 	double matching_score = 0.0;
 	for (int i = 0; i < nb_chan; i++) {
-		matching_score = matching_score + compareHist(base_histo[0], cmp_histo[0], method);
+		matching_score = matching_score + compareHist(base_histo[i], cmp_histo[i], method);
 	}
 	return matching_score;
 }
 
 void computeSingleBoxMask(Mat& src, Mat& dst, int postbox_index) {
 	Point corners[] = {
-	 Point(PostboxLocations[postbox_index][POSTBOX_TOP_LEFT_COLUMN],PostboxLocations[postbox_index][POSTBOX_TOP_LEFT_ROW]),
-	 Point(PostboxLocations[postbox_index][POSTBOX_BOTTOM_LEFT_COLUMN],PostboxLocations[postbox_index][POSTBOX_BOTTOM_LEFT_ROW]),
-	 Point(PostboxLocations[postbox_index][POSTBOX_BOTTOM_RIGHT_COLUMN],PostboxLocations[postbox_index][POSTBOX_BOTTOM_RIGHT_ROW]),
-	 Point(PostboxLocations[postbox_index][POSTBOX_TOP_RIGHT_COLUMN],PostboxLocations[postbox_index][POSTBOX_TOP_RIGHT_ROW]),
+		Point(PostboxLocations[postbox_index][POSTBOX_TOP_LEFT_COLUMN],PostboxLocations[postbox_index][POSTBOX_TOP_LEFT_ROW]),
+		Point(PostboxLocations[postbox_index][POSTBOX_BOTTOM_LEFT_COLUMN],PostboxLocations[postbox_index][POSTBOX_BOTTOM_LEFT_ROW]),
+		Point(PostboxLocations[postbox_index][POSTBOX_BOTTOM_RIGHT_COLUMN],PostboxLocations[postbox_index][POSTBOX_BOTTOM_RIGHT_ROW]),
+		Point(PostboxLocations[postbox_index][POSTBOX_TOP_RIGHT_COLUMN],PostboxLocations[postbox_index][POSTBOX_TOP_RIGHT_ROW]),
 	};
 	const Point* corner_list[] = { corners };
 	int num_points = 4;
@@ -101,16 +106,48 @@ void checkBoxesHavePost(Mat& src, Mat& background_src, bool box_has_post[]) {
 		// Compare both histograms.
 		int method = cv::HISTCMP_CHISQR;
 		double matching_sum = computeCmpHist(single_postobox_background_histo, single_postbox_histo, method, src.channels());
-		if (matching_sum >= 2) {
+		if (matching_sum >= 1.8) {
 			box_has_post[i] = true;
 		}
 	}
 }
 
-void makeOutputString(bool box_has_post[], int frame_count) {
+void updateConfusionMatViewObscured(int frame_count, int confusion_matrix[], bool ground_truth[]) {
+	// When the view is found obscured, add a true negative if the ground truth also is, otherwise add a false negative.
+	if (ground_truth[6]) {
+		confusion_matrix[TRUE_NEGATIVE]++;
+	}
+	else {
+		confusion_matrix[FALSE_NEGATIVE]++;
+	}
+}
+
+void updateConfusionMatAndOutput(bool box_has_post[], int frame_count, int confusion_matrix[], bool ground_truth[]) {
 	char output_str[100] = "";
 	bool found_a_letter = false;
+	// Count a view obscured as a single false negative
+	bool is_view_obscured = false;
+	if (ground_truth[6]) {
+		is_view_obscured = true;
+		confusion_matrix[FALSE_NEGATIVE]++;
+	}
 	for (int i = 0; i < NUMBER_OF_POSTBOXES; i++) {
+		// When the view is not obscured, add one of the TP TN FP FN per box.
+		if (!is_view_obscured) {
+			if (box_has_post[i] && ground_truth[i]) {
+				confusion_matrix[TRUE_POSITIVE]++;
+			}
+			else if (!box_has_post[i] && !ground_truth[i]) {
+				confusion_matrix[TRUE_NEGATIVE]++;
+			}
+			else if (!box_has_post[i] && ground_truth[i]) {
+				confusion_matrix[FALSE_NEGATIVE]++;
+			}
+			else {
+				confusion_matrix[FALSE_POSITIVE]++;
+			}
+		}
+		// Build string output
 		if (box_has_post[i]) {
 			int true_index = i + 1;
 			found_a_letter = true;
@@ -148,6 +185,45 @@ void MyApplication()
 		cout << "Video file is not open: " << filename << endl;
 		return;
 	}
+	// video frame count
+	int nb_frames = 95;
+
+	// Read ground truth values
+	std::ifstream infile("Media/ground_truth.txt");
+	if (!infile.is_open()) {
+		cout << "error opening ground truth file.";
+	}
+	vector<bool[7]> ground_truth(nb_frames);
+	int count = 0;
+	// Update ground truth vector with each line for each frame
+	for (string line; getline(infile, line); )
+	{
+		size_t comme_pos = line.find(", ");
+		size_t no_post = line.find("No post");
+		size_t obscured = line.find("View obscured");
+		if (obscured != string::npos) {
+			ground_truth[count++][6] = true;
+			continue;
+		}
+
+		size_t pos_1 = line.find("1", comme_pos);
+		size_t pos_2 = line.find("2", comme_pos);
+		size_t pos_3 = line.find("3", comme_pos);
+		size_t pos_4 = line.find("4", comme_pos);
+		size_t pos_5 = line.find("5", comme_pos);
+		size_t pos_6 = line.find("6", comme_pos);
+	
+		ground_truth[count][0] = pos_1 != string::npos;
+		ground_truth[count][1] = pos_2 != string::npos;
+		ground_truth[count][2] = pos_3 != string::npos;
+		ground_truth[count][3] = pos_4 != string::npos;
+		ground_truth[count][4] = pos_5 != string::npos;
+		ground_truth[count][5] = pos_6 != string::npos;
+		ground_truth[count][6] = false;
+		count++;
+	}
+
+	int confusion_matrix[4] = { 0, 0, 0, 0 };
 
 	Mat current_frame, selective_running_average_background, selective_running_average_foreground_image, first_frame_foreground;
 	double running_average_learning_rate = 0.01;
@@ -160,7 +236,7 @@ void MyApplication()
 	selective_running_average_background.convertTo(selective_running_average_background, CV_32F);
 
 	MatND* first_frame_histo;
-
+	bool last_frame_obscured = false, obscure_next_frame = false;
 	int frame_count = 1;
 	while ((!current_frame.empty()))
 	{
@@ -171,18 +247,12 @@ void MyApplication()
 		vector<Mat> selective_running_average_planes = findForegroundMask(selective_running_average_background, temp_selective_running_average_background, processed_img);
 		
 		// Sum up points and run Otsu thresholding to obtain the foreground.
-		// TODO compare with all /3 and use 30 cst thresh
 		Mat temp_sum = (selective_running_average_planes[0] + selective_running_average_planes[1] + selective_running_average_planes[2]);
 		Mat selective_running_average_foreground_mask;
 		threshold(temp_sum, selective_running_average_foreground_mask, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
+		
 		// Run a close operation on the result.
-		Mat closed_image;
 		morphologyEx(selective_running_average_foreground_mask, selective_running_average_foreground_mask, MORPH_CLOSE, Mat());
-		/*
-		TODO compare both techinques see if 1 is better.
-		Mat opened_image;
-		morphologyEx(selective_running_average_foreground_mask, opened_image, MORPH_OPEN, Mat());
-		*/
 
 		// Update background
 		vector<Mat> input_planes(3);
@@ -194,35 +264,49 @@ void MyApplication()
 		selective_running_average_foreground_image.setTo(Scalar(0, 0, 0));
 		current_frame.copyTo(selective_running_average_foreground_image, selective_running_average_foreground_mask);
 		
-		Mat histo_img;
+		// Compute histograms
+		Mat histo_img, other_histo;
 		MatND* colour_histogram = computeHistogram(selective_running_average_foreground_image, histo_img);
 		if (frame_count == 1) {
 			first_frame_foreground = selective_running_average_foreground_image.clone();
-			first_frame_histo = computeHistogram(selective_running_average_foreground_image, Mat());
+			first_frame_histo = computeHistogram(selective_running_average_foreground_image, other_histo);
 		}
 
+		// Compare current histogram with the one from the first frame.
 		int method = cv::HISTCMP_CHISQR;
 		double matching_sum = computeCmpHist(first_frame_histo, colour_histogram, method, selective_running_average_foreground_image.channels());
-
-		if (matching_sum > 2) {
+		if (matching_sum > 3 || obscure_next_frame) {
+			if (obscure_next_frame && matching_sum < 3) {
+				// After the end of an obscured view period, mark the following frame as obscured to let the learning rate adapt.
+				obscure_next_frame = false;
+			}
+			else if (!last_frame_obscured) {
+				obscure_next_frame = true;
+			}
+			updateConfusionMatViewObscured(frame_count, confusion_matrix, ground_truth[frame_count - 1]);
 			cout << frame_count << ", View obscured" << "\n";
 		}
 		else {
+			// Normal, non-obscured view.
 			bool box_has_post[NUMBER_OF_POSTBOXES] = {
 				false, false, false, false, false, false
 			};
 			checkBoxesHavePost(selective_running_average_foreground_image, first_frame_foreground, box_has_post);
-			makeOutputString(box_has_post, frame_count);
+			updateConfusionMatAndOutput(box_has_post, frame_count, confusion_matrix, ground_truth[frame_count - 1]);
+			
 		}
 
+		// Display current image and go to next frame.
 		char frame_str[100];
 		sprintf(frame_str, "Frame = %d, cmp = %f", frame_count++, matching_sum);
 		Mat temp_selective_output = JoinImagesHorizontally(current_frame, frame_str, temp_selective_running_average_background, "Selective Running Average Background", 4);
 		Mat selective_output = JoinImagesHorizontally(temp_selective_output, "", selective_running_average_foreground_image, "Foreground", 4);
 		imshow("Selective Running Average Background Model", selective_output);
 		video >> current_frame;
-		char c = cv::waitKey(1000);
+		last_frame_obscured = matching_sum > 3;
+		char c = cv::waitKey(10);
 	}
+	cout << confusion_matrix[0] << " - " << confusion_matrix[1] << " - " << confusion_matrix[2] << " - " << confusion_matrix[3];
 	cv::destroyAllWindows();
 
 }
