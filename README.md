@@ -9,3 +9,5 @@ Detect wheter an image includes a spoon
 
 ## Assignment 2
 Detect within a video for each frame which post boxes have and don't have mail. Also detect when the view is obfuscated
+
+See PDF reports for explanations & image of the processing done.
