@@ -4,6 +4,7 @@
 # But not these files...
 !.gitignore
 !*.cpp
+!*.pdf
 
 # ...even if they are in subdirectories
 !*/
